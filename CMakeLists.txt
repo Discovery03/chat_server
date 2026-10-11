@@ -16,14 +16,14 @@ endif()
 find_package(Threads REQUIRED)
 
 # ---- Core library: everything except main() ---------------------------------
-# Add each .cpp here as you finish splitting its class.
 add_library(chat_core
+    src/util.cpp
     src/ClientSession.cpp
     src/UserDirectory.cpp
     src/ClientRegistry.cpp
-    # src/GroupRegistry.cpp
-    # src/CommandProcessor.cpp
-    # src/ChatServer.cpp
+    src/GroupRegistry.cpp
+    src/CommandProcessor.cpp
+    src/ChatServer.cpp
 )
 target_include_directories(chat_core PUBLIC include)
 target_compile_options(chat_core PRIVATE -Wall -Wextra)

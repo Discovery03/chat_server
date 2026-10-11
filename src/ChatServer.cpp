@@ -1,7 +1,25 @@
+#include "chat/ChatServer.hpp"
 
-#include "../include/chat/util.hpp"
-#include "../include/chat/ChatServer.hpp"
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
+#include <cerrno>
+#include <chrono>
+#include <cstdint>
+#include <cstdio>
+#include <memory>
+#include <thread>
+#include <utility>
+
+#include "chat/util.hpp"
+
+ChatServer::ChatServer(int port, UserDirectory users)
+    : port_(port), users_(std::move(users)), processor_(clients_, groups_) {}
+
+ChatServer::~ChatServer() {
+    if (listenFd_ >= 0) ::close(listenFd_);
+}
 
 bool ChatServer::start() {
     listenFd_ = ::socket(AF_INET, SOCK_STREAM, 0);
@@ -79,8 +97,8 @@ void ChatServer::handleClient(SessionPtr session) {
     }
 
     util::log(*username + " connected");
-    session->send("Welcome to the chat server !");
-    clients_.broadcast(*username + " has joined the chat.", *username);
+    session->send("Welcome to the chat server !\n");
+    clients_.broadcast(*username + " has joined the chat.\n", *username);
 
     while (auto line = session->receive()) {
         if (!processor_.process(*session, *line)) break;
