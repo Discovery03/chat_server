@@ -2,18 +2,21 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-#include "ClientRegistry.hpp"
 #include "ClientSession.hpp"
 #include "GroupRegistry.hpp"
+#include "MessageRouter.hpp"
 
 // ---------------------------------------------------------------------------
 // CommandProcessor: turns "/command args..." into a handler call.
 // A table maps each command to its handler and error text. Adding a command
 // is one table row plus one method.
+//
+// It only ever touches the SENDER's session directly. Messages for other users
+// go through the MessageRouter, because their sessions may live on other threads.
 // ---------------------------------------------------------------------------
 class CommandProcessor {
 public:
-  CommandProcessor(ClientRegistry &clients, GroupRegistry &groups);
+  CommandProcessor(MessageRouter &router, GroupRegistry &groups);
 
   // Returns false when the client asked to disconnect.
   bool process(ClientSession &session, const std::string &line);
@@ -46,7 +49,7 @@ private:
   // /group_msg <name> <text...>
   bool groupMessage(ClientSession &sender, const Args &args);
 
-  ClientRegistry &clients_;
+  MessageRouter &router_;
   GroupRegistry &groups_;
   std::unordered_map<std::string, Command> commands_;
 };

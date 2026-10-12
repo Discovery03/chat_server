@@ -2,8 +2,8 @@
 
 #include "chat/util.hpp"
 
-CommandProcessor::CommandProcessor(ClientRegistry &clients, GroupRegistry &groups)
-    : clients_(clients), groups_(groups) {
+CommandProcessor::CommandProcessor(MessageRouter &router, GroupRegistry &groups)
+    : router_(router), groups_(groups) {
   commands_ = {
       {"/msg",
        {&CommandProcessor::privateMessage,
@@ -48,17 +48,17 @@ bool CommandProcessor::process(ClientSession &session, const std::string &line) 
 bool CommandProcessor::privateMessage(ClientSession &sender, const Args &args) {
   if (args.size() < 3)
     return false;
-  SessionPtr target = clients_.find(args[1]);
-  if (!target || target.get() == &sender)
+  if (args[1] == sender.username())
     return false;
-  target->send("[" + sender.username() + "]: " + util::join(args, 2) + "\n");
-  return true;
+  // false if the receiver is not online
+  return router_.deliver(args[1],
+                         "[" + sender.username() + "]: " + util::join(args, 2) + "\n");
 }
 
 bool CommandProcessor::broadcast(ClientSession &sender, const Args &args) {
   if (args.size() < 2)
     return false;
-  clients_.broadcast("[Broadcast from " + sender.username() +
+  router_.broadcast("[Broadcast from " + sender.username() +
                          "]: " + util::join(args, 1) + "\n",
                      sender.username());
   return true;
@@ -97,8 +97,7 @@ bool CommandProcessor::groupMessage(ClientSession &sender, const Args &args) {
   for (const std::string &name : *members) {
     if (name == sender.username())
       continue;
-    if (SessionPtr target = clients_.find(name))
-      target->send(message);
+    router_.deliver(name, message);  // offline members are simply skipped
   }
   return true;
 }

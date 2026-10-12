@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """End-to-end checks for the chat server. Starts the server itself.
 
-Usage:  python3 tests/smoke_test.py [path/to/chat_server]   (default: build/chat_server)
+Usage:  python3 tests/smoke_test.py [path/to/chat_server] [event_loops]
+        (defaults: build/chat_server, and the server's own default loop count)
 
 Checks run in order and stop at the first failure, so you can implement the
 server step by step and see how far you get.
@@ -70,13 +71,14 @@ def login(user, password):
 
 def main():
     binary = sys.argv[1] if len(sys.argv) > 1 else "build/chat_server"
+    loops = sys.argv[2:3]  # optional 3rd server argument: number of event loops
     tmp = tempfile.mkdtemp()
     users = os.path.join(tmp, "users.txt")
     with open(users, "w") as f:
         f.write("alice:pw1\nbob:pw2\n")
         f.writelines(f"u{i}:p{i}\n" for i in range(N_CLIENTS))
 
-    server = subprocess.Popen([binary, str(PORT), users],
+    server = subprocess.Popen([binary, str(PORT), users] + loops,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     for _ in range(50):  # wait for it to listen
         try:
@@ -162,17 +164,17 @@ def main():
             c.close()
 
     tests = [
-        ("login two users", t_login, "Exercises 1, 2, 5a-5e. Is accept/readAvailable/nextLine/send working?"),
-        ("private message", t_msg, "Check the Chatting branch of handleLine."),
+        ("login two users", t_login, "No prompt? 6 (mailbox), 7a (loop), 7b (adopt), 8a (acceptor). No welcome? 7e. No join notice? 7f, 8c, 7d."),
+        ("private message", t_msg, "8b deliver (registry lookup + post) and 7c deliverLocal (byName_)."),
         ("two lines in one packet", t_two_lines_one_packet, "nextLine() must leave the 2nd line in inBuf_; onReadable must loop."),
         ("line split across packets", t_line_split_across_packets, "nextLine() must return nullopt until the '\\n' arrives."),
         ("\\r\\n line endings", t_crlf, "Strip the trailing '\\r' from the line."),
         ("many short lines in one burst", t_many_short_lines_one_burst, "The line limit must only apply to a line with no '\\n' yet."),
         ("overlong line disconnects", t_overlong_line_disconnects, "readAvailable: inBuf_ > kMaxLineLength with no '\\n' -> return false."),
         ("wrong password rejected + closed", t_bad_password, "markClosed + final flush + closeSession in onReadable."),
-        ("duplicate login doesn't kick original", t_duplicate_login_keeps_original, "closeSession: only clean up registries when state == Chatting."),
-        ("/exit closes connection", t_exit, "process() returns false on /exit -> markClosed -> closeSession."),
-        (f"{N_CLIENTS} concurrent clients + broadcast", t_many_clients, "acceptClients must loop until EAGAIN."),
+        ("duplicate login doesn't kick original", t_duplicate_login_keeps_original, "7e: clients_.add must fail for a name online on ANY loop; closeSession only cleans up when Chatting."),
+        ("/exit closes connection", t_exit, "7g: after /exit, bob must be gone from the registry (and from byName_)."),
+        (f"{N_CLIENTS} concurrent clients + broadcast", t_many_clients, "8c: one post per loop; 7d: broadcastLocal to everyone on that loop."),
     ]
 
     failed = False
@@ -189,7 +191,7 @@ def main():
         server.kill()
         out = server.communicate()[0].decode()
         if failed and out.strip():
-            print("---- server output ----\n" + out[-2000:])
+            print("---- server output ----\n" + out[-8000:])
     if not failed:
         print("All checks passed.")
     return 1 if failed else 0

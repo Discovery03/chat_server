@@ -1,30 +1,31 @@
 // ---------------------------------------------------------------------------
-// ClientRegistry: who is online. The lock only guards the map. Network sends
-// happen after the lock is released, so one slow client cannot stall everyone.
+// ClientRegistry: who is online, and WHICH EVENT LOOP owns them.
+// Shared by all loops, so every method takes the lock.
+//
+// It deliberately stores the owning loop, not the session: other threads must
+// not touch a session they don't own, so they only need to know where to
+// send a message (see MessageRouter / EventLoop::post).
 // ---------------------------------------------------------------------------
 
 #pragma once
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include <vector>
-#include "ClientSession.hpp"
+
+class EventLoop;
 
 class ClientRegistry {
     public:
         // Atomic "check not taken + insert", so two simultaneous logins with the
-        // same username cannot both succeed.
-        bool add(const std::string& username, SessionPtr session);
+        // same username (even on different loops) cannot both succeed.
+        bool add(const std::string& username, EventLoop* owner);
 
         void remove(const std::string& username);
 
-        SessionPtr find(const std::string& username) const;
-
-        void broadcast(const std::string& message, const std::string& exceptUser) const;
+        // The loop that owns `username`, or nullptr if they are not online.
+        EventLoop* find(const std::string& username) const;
 
     private:
-        std::vector<SessionPtr> snapshotExcept(const std::string& exceptUser) const;
-
         mutable std::mutex mutex_;
-        std::unordered_map<std::string, SessionPtr> sessions_;
+        std::unordered_map<std::string, EventLoop*> owners_;
 };

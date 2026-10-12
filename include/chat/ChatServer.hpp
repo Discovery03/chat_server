@@ -1,48 +1,48 @@
 // ---------------------------------------------------------------------------
-// ChatServer: owns the listening socket and runs a single-threaded epoll
-// event loop ("reactor"). One thread serves every client: it sleeps in
-// epoll_wait until some socket is ready, handles exactly that, and goes back.
+// ChatServer: multi-reactor ("one loop per thread").
+//
+//   main thread:  accept() ──round-robin──► loop 0 │ loop 1 │ ... │ loop N-1
+//                                             each: own thread, own epoll,
+//                                             owns the clients it was given
+//
+// It also implements MessageRouter: to reach a user, look up which loop owns
+// them in ClientRegistry, and post() the work to that loop.
 // ---------------------------------------------------------------------------
 
 #pragma once
+#include <memory>
 #include <string>
-#include <unordered_map>
+#include <vector>
 #include "ClientRegistry.hpp"
-#include "ClientSession.hpp"
-#include "CommandProcessor.hpp"
-#include "Epoll.hpp"
+#include "EventLoop.hpp"
 #include "GroupRegistry.hpp"
+#include "MessageRouter.hpp"
 #include "UserDirectory.hpp"
 
-class ChatServer {
+class ChatServer : public MessageRouter {
     public:
-        ChatServer(int port, UserDirectory users);
-        ~ChatServer();
+        ChatServer(int port, UserDirectory users, int numLoops);
+        ~ChatServer() override;
 
         ChatServer(const ChatServer&) = delete;
         ChatServer& operator=(const ChatServer&) = delete;
 
+        // Opens the listening socket and starts the loop threads.
         bool start();
-        // Event loop. Never returns.
+        // Accept loop on the calling thread. Never returns.
         void run();
 
-    private:
-        // Accepts every pending connection on the (non-blocking) listen socket.
-        void acceptClients();
-        // EPOLLIN on a client: read, then handle each complete line.
-        void onReadable(const SessionPtr& session);
-        // One complete line from a client, routed by its login state.
-        void handleLine(ClientSession& session, const std::string& line);
-        // Unregisters the session everywhere. Its fd closes when the last
-        // SessionPtr goes away.
-        void closeSession(const SessionPtr& session);
+        // MessageRouter (called from any loop thread):
+        bool deliver(const std::string& username, std::string text) override;
+        void broadcast(std::string text, const std::string& exceptUser) override;
 
+    private:
         int port_;
+        int numLoops_;
         int listenFd_ = -1;
-        Epoll epoll_;
         UserDirectory users_;
-        ClientRegistry clients_;   // logged-in users, by name
+        ClientRegistry clients_;
         GroupRegistry groups_;
-        CommandProcessor processor_;  // declared after clients_ / groups_: it holds references to them
-        std::unordered_map<int, SessionPtr> sessions_;  // every connection (logged in or not), by fd
+        std::vector<std::unique_ptr<EventLoop>> loops_;  // unique_ptr: loops never move in memory
+        std::size_t nextLoop_ = 0;  // round-robin cursor (only the acceptor thread uses it)
 };

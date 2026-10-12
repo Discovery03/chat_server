@@ -15,10 +15,19 @@ endif()
 
 find_package(Threads REQUIRED)
 
+# Optional sanitizer build, e.g. ThreadSanitizer to catch data races:
+#   cmake -S . -B build-tsan -DCHAT_SANITIZER=thread && cmake --build build-tsan
+set(CHAT_SANITIZER "" CACHE STRING "Build with a sanitizer: thread or address (empty = none)")
+if(CHAT_SANITIZER)
+    add_compile_options(-fsanitize=${CHAT_SANITIZER} -g -O1 -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=${CHAT_SANITIZER})
+endif()
+
 # ---- Core library: everything except main() ---------------------------------
 add_library(chat_core
     src/util.cpp
     src/Epoll.cpp
+    src/EventLoop.cpp
     src/ClientSession.cpp
     src/UserDirectory.cpp
     src/ClientRegistry.cpp
