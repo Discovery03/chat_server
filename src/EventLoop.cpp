@@ -21,7 +21,7 @@
 EventLoop::EventLoop(int id, const UserDirectory& users, ClientRegistry& clients,
                      GroupRegistry& groups, MessageRouter& router)
     : id_(id), users_(users), clients_(clients), groups_(groups), router_(router),
-      processor_(router, groups) {
+      processor_(router, groups, clients) {
     // The doorbell. An eventfd is a file descriptor wrapping a 64-bit counter
     // in the kernel: write() adds to it, read() returns it and resets it to 0,
     // and while it is > 0 the fd counts as "readable".
@@ -251,9 +251,9 @@ void EventLoop::handleLine(ClientSession& session, const std::string& line) {
             util::log(username + " connected");
             session.send("Welcome to the chat server !\n");
 
-            // Other users may be on any loop, so this goes through the router
-            // (one post per loop), not directly to anyone's session.
-            router_.broadcast(username + " has joined the chat.\n", username);
+            // No "<name> has joined the chat" broadcast: pushing it to every
+            // online user made each login O(N) and N logins O(N^2). Users ask
+            // with /online instead (see CommandProcessor::online).
             break;
         }
 

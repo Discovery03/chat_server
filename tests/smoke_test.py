@@ -95,7 +95,10 @@ def main():
     def t_login():
         st["alice"] = login("alice", "pw1")
         st["bob"] = login("bob", "pw2")
-        st["alice"].expect("bob has joined the chat.\n")
+
+    def t_online():
+        st["alice"].send("/online\n")
+        st["alice"].expect("Online (2): alice bob\n")
 
     def t_msg():
         st["alice"].send("/msg bob hi there\n")
@@ -164,7 +167,8 @@ def main():
             c.close()
 
     tests = [
-        ("login two users", t_login, "No prompt? 6 (mailbox), 7a (loop), 7b (adopt), 8a (acceptor). No welcome? 7e. No join notice? 7f, 8c, 7d."),
+        ("login two users", t_login, "No prompt? 6 (mailbox), 7a (loop), 7b (adopt), 8a (acceptor). No welcome? 7e."),
+        ("/online lists both users", t_online, "ClientRegistry::onlineUsers + CommandProcessor::online."),
         ("private message", t_msg, "8b deliver (registry lookup + post) and 7c deliverLocal (byName_)."),
         ("two lines in one packet", t_two_lines_one_packet, "nextLine() must leave the 2nd line in inBuf_; onReadable must loop."),
         ("line split across packets", t_line_split_across_packets, "nextLine() must return nullopt until the '\\n' arrives."),

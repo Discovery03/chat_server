@@ -2,6 +2,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "ClientRegistry.hpp"
 #include "ClientSession.hpp"
 #include "GroupRegistry.hpp"
 #include "MessageRouter.hpp"
@@ -16,7 +17,8 @@
 // ---------------------------------------------------------------------------
 class CommandProcessor {
 public:
-  CommandProcessor(MessageRouter &router, GroupRegistry &groups);
+  CommandProcessor(MessageRouter &router, GroupRegistry &groups,
+                   const ClientRegistry &clients);
 
   // Returns false when the client asked to disconnect.
   bool process(ClientSession &session, const std::string &line);
@@ -49,7 +51,11 @@ private:
   // /group_msg <name> <text...>
   bool groupMessage(ClientSession &sender, const Args &args);
 
+  // /online — who is online (first kOnlineListLimit names, sorted)
+  bool online(ClientSession &sender, const Args &args);
+
   MessageRouter &router_;
   GroupRegistry &groups_;
+  const ClientRegistry &clients_;  // read-only here: presence queries for /online
   std::unordered_map<std::string, Command> commands_;
 };

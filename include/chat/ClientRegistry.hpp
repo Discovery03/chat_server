@@ -11,6 +11,7 @@
 #include <mutex>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 class EventLoop;
 
@@ -24,6 +25,10 @@ class ClientRegistry {
 
         // The loop that owns `username`, or nullptr if they are not online.
         EventLoop* find(const std::string& username) const;
+
+        // Number of users online, and up to `limit` of their names (sorted).
+        std::size_t onlineCount() const;
+        std::vector<std::string> onlineUsers(std::size_t limit) const;
 
     private:
         mutable std::mutex mutex_;

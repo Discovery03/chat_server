@@ -2,8 +2,15 @@
 
 #include "chat/util.hpp"
 
-CommandProcessor::CommandProcessor(MessageRouter &router, GroupRegistry &groups)
-    : router_(router), groups_(groups) {
+namespace {
+// /online lists at most this many names, so the reply stays small even with
+// thousands of users online.
+constexpr std::size_t kOnlineListLimit = 100;
+}
+
+CommandProcessor::CommandProcessor(MessageRouter &router, GroupRegistry &groups,
+                                   const ClientRegistry &clients)
+    : router_(router), groups_(groups), clients_(clients) {
   commands_ = {
       {"/msg",
        {&CommandProcessor::privateMessage,
@@ -23,6 +30,8 @@ CommandProcessor::CommandProcessor(MessageRouter &router, GroupRegistry &groups)
       {"/group_msg",
        {&CommandProcessor::groupMessage,
         "Error: Check group name, membership or message and try again\n"}},
+      {"/online",
+       {&CommandProcessor::online, "Error: Usage: /online\n"}},
   };
 }
 
@@ -99,5 +108,21 @@ bool CommandProcessor::groupMessage(ClientSession &sender, const Args &args) {
       continue;
     router_.deliver(name, message);  // offline members are simply skipped
   }
+  return true;
+}
+
+// Presence is PULLED with /online instead of PUSHED on every login. Pushing
+// "<name> has joined" to every user made each login cost O(users online), so
+// N logins cost O(N^2) messages (~50 million for 10k users).
+bool CommandProcessor::online(ClientSession &sender, const Args &args) {
+  if (args.size() != 1)
+    return false;
+  const std::size_t total = clients_.onlineCount();
+  const std::vector<std::string> names = clients_.onlineUsers(kOnlineListLimit);
+
+  std::string reply = "Online (" + std::to_string(total) + "): " + util::join(names, 0);
+  if (total > names.size())
+    reply += " ... and " + std::to_string(total - names.size()) + " more";
+  sender.send(reply + "\n");
   return true;
 }
