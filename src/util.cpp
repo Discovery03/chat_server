@@ -4,6 +4,7 @@
 #include <cctype>
 #include <iostream>
 #include <mutex>
+#include <fcntl.h>
 
 namespace util {
 
@@ -43,6 +44,14 @@ namespace util {
         int port = std::stoi(s);
         if (port < 1 || port > 65535) return std::nullopt;
         return port;
+    }
+
+    // EXERCISE 2 — `man fcntl`.
+    bool setNonBlocking(int fd) {
+        int curr_flags = fcntl(fd, F_GETFL);
+        if(curr_flags == -1) return false;
+        curr_flags = curr_flags | O_NONBLOCK;
+        return !fcntl(fd, F_SETFL, curr_flags | O_NONBLOCK);
     }
 
     void log(const std::string& line) {

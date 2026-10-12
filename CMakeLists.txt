@@ -18,6 +18,7 @@ find_package(Threads REQUIRED)
 # ---- Core library: everything except main() ---------------------------------
 add_library(chat_core
     src/util.cpp
+    src/Epoll.cpp
     src/ClientSession.cpp
     src/UserDirectory.cpp
     src/ClientRegistry.cpp

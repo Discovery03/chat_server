@@ -17,6 +17,10 @@ namespace util {
 
     std::optional<int> parsePort(const std::string& s);
 
+    // Puts fd into non-blocking mode: recv/send/accept return -1 with
+    // errno == EAGAIN instead of blocking. Returns false on failure.
+    bool setNonBlocking(int fd);
+
     // Thread-safe line output to stdout.
     void log(const std::string& line);
 
