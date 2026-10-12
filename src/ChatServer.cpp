@@ -88,7 +88,7 @@ void ChatServer::run() {
         //
         // The lambda captures `loop` and `fd` by value (they're just a pointer
         // and an int), because it runs later, on the other thread.
-        loop->post([loop, fd] { loop->adoptConnection(fd); });
+        loop->post([loop, fd]()->void { loop->adoptConnection(fd); });
     }
 }
 

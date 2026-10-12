@@ -26,25 +26,7 @@ ClientSession::~ClientSession() {
 
 int ClientSession::fd() const { return fd_; }
 
-// ===========================================================================
-// EXERCISE 3 — reading and framing
-// ===========================================================================
-
 bool ClientSession::readAvailable() {
-  // TODO(you): loop calling ::recv(fd_, buffer, sizeof(buffer), 0) and
-  //            append what you get to inBuf_.
-  // The three outcomes of recv on a non-blocking socket:
-  //   n > 0   -> got n bytes, append and keep looping
-  //   n == 0  -> peer closed the connection -> return false
-  //   n < 0   -> look at errno:
-  //                EAGAIN / EWOULDBLOCK -> nothing more to read now: return
-  //                true EINTR                -> just retry
-  //                anything else ->
-  //                real error: return false
-  // Also: if inBuf_ grows beyond kMaxLineLength *without containing a '\n'*,
-  //       return false (protects the server from a client that never ends a
-  //       line).
-
   while (true) {
 
     char buff[kBufferSize];
@@ -94,14 +76,7 @@ std::optional<std::string> ClientSession::nextLine() {
   return util::stripLineEnding(ret);
 }
 
-// ===========================================================================
-// EXERCISE 4 — writing with backpressure
-// ===========================================================================
-
 bool ClientSession::send(const std::string &message) {
-  // TODO(you): if closed_, return false. Otherwise append message to outBuf_
-  //            and return flush().
-
   if (closed_)
     return false;
 
@@ -110,24 +85,8 @@ bool ClientSession::send(const std::string &message) {
 }
 
 bool ClientSession::flush() {
-
-  // TODO(you): while outBuf_ is not empty, ::send() from outBuf_.data() with
-  //            MSG_NOSIGNAL (keep that flag, it's why a dead client can't kill
-  //            the server) and erase the bytes that were written from the
-  //            front.
-  //   n < 0 with EAGAIN/EWOULDBLOCK -> kernel send buffer is full; stop looping
-  //   n < 0 with EINTR              -> retry
-  //   other errors                  -> return false
-  //
-  // After the loop, keep the EPOLLOUT subscription in sync:
-  //   - data still left AND !wantWrite_ -> epoll_.modify(fd_, EPOLLIN |
-  //   EPOLLOUT),
-  //                                        wantWrite_ = true
-  //   - buffer empty    AND  wantWrite_ -> epoll_.modify(fd_, EPOLLIN),
-  //                                        wantWrite_ = false
-  // Think: why not just stay subscribed to EPOLLOUT all the time?
-  //        (Answer is in the comment at the bottom of ChatServer.cpp's run()).
-
+  // MSG_NOSIGNAL: a peer that has closed gives EPIPE instead of a SIGPIPE
+  // that would kill the whole server.
   while (!outBuf_.empty()) {
     int bytes_send = ::send(fd_, outBuf_.data(), outBuf_.size(), MSG_NOSIGNAL);
     if (bytes_send < 0) {
@@ -148,7 +107,8 @@ bool ClientSession::flush() {
     }
   }
 
-
+  // Subscribe to EPOLLOUT only while bytes are pending: a socket is almost
+  // always writable, so a permanent subscription would make epoll_wait spin.
   if(outBuf_.size() && !wantWrite_){
     epoll_.modify(fd_, EPOLLIN | EPOLLOUT);
     wantWrite_ = true;

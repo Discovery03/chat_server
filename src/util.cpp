@@ -46,7 +46,6 @@ namespace util {
         return port;
     }
 
-    // EXERCISE 2 — `man fcntl`.
     bool setNonBlocking(int fd) {
         int curr_flags = fcntl(fd, F_GETFL);
         if(curr_flags == -1) return false;

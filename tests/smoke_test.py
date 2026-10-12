@@ -167,18 +167,18 @@ def main():
             c.close()
 
     tests = [
-        ("login two users", t_login, "No prompt? 6 (mailbox), 7a (loop), 7b (adopt), 8a (acceptor). No welcome? 7e."),
+        ("login two users", t_login, "No prompt? Check ChatServer::run -> EventLoop::post/drainMailbox -> adoptConnection. No welcome? Check login in EventLoop::handleLine."),
         ("/online lists both users", t_online, "ClientRegistry::onlineUsers + CommandProcessor::online."),
-        ("private message", t_msg, "8b deliver (registry lookup + post) and 7c deliverLocal (byName_)."),
+        ("private message", t_msg, "ChatServer::deliver (registry lookup + post) and EventLoop::deliverLocal (byName_)."),
         ("two lines in one packet", t_two_lines_one_packet, "nextLine() must leave the 2nd line in inBuf_; onReadable must loop."),
         ("line split across packets", t_line_split_across_packets, "nextLine() must return nullopt until the '\\n' arrives."),
         ("\\r\\n line endings", t_crlf, "Strip the trailing '\\r' from the line."),
         ("many short lines in one burst", t_many_short_lines_one_burst, "The line limit must only apply to a line with no '\\n' yet."),
         ("overlong line disconnects", t_overlong_line_disconnects, "readAvailable: inBuf_ > kMaxLineLength with no '\\n' -> return false."),
         ("wrong password rejected + closed", t_bad_password, "markClosed + final flush + closeSession in onReadable."),
-        ("duplicate login doesn't kick original", t_duplicate_login_keeps_original, "7e: clients_.add must fail for a name online on ANY loop; closeSession only cleans up when Chatting."),
-        ("/exit closes connection", t_exit, "7g: after /exit, bob must be gone from the registry (and from byName_)."),
-        (f"{N_CLIENTS} concurrent clients + broadcast", t_many_clients, "8c: one post per loop; 7d: broadcastLocal to everyone on that loop."),
+        ("duplicate login doesn't kick original", t_duplicate_login_keeps_original, "clients_.add must fail for a name online on ANY loop; closeSession only cleans up when Chatting."),
+        ("/exit closes connection", t_exit, "After /exit, bob must be gone from ClientRegistry and from byName_ (closeSession)."),
+        (f"{N_CLIENTS} concurrent clients + broadcast", t_many_clients, "ChatServer::broadcast posts once per loop; EventLoop::broadcastLocal sends to that loop's users."),
     ]
 
     failed = False
