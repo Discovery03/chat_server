@@ -1,0 +1,10 @@
+name: CI
+on: [push]
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cmake -S . -B build && cmake --build build
+      - run: python3 tests/smoke_test.py build/chat_server
+
